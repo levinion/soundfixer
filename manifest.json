@@ -4,11 +4,6 @@
   "author": "levinion",
   "version": "1.5.0",
   "description": "SoundFixer fork with exponentially modulated gain",
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "soundfixer@unrelenting.technology"
-    }
-  },
   "icons": {
     "96": "icon.svg",
     "48": "icon.svg"
