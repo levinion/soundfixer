@@ -1,12 +1,12 @@
 {
   "manifest_version": 2,
-  "name": "SoundFixer-Expo",
+  "name": "SoundFixer",
   "author": "levinion",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "SoundFixer fork with exponentially modulated gain",
   "browser_specific_settings": {
     "gecko": {
-      "id": "soundfixer@levinion.com"
+      "id": "{5bd918da-7a46-4501-9d76-a404d2e484d5}"
     }
   },
   "icons": {
