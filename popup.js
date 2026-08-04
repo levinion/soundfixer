@@ -47,8 +47,10 @@ function applySettings(fid, elid, newSettings) {
 				el.xSoundFixerPan.connect(el.xSoundFixerContext.destination)
 			}
 		}
+		// store the same exponential gain parameter the popup slider uses,
+		// so reopening the popup restores the exact same position
 		el.xSoundFixerSettings = {
-			gain: el.xSoundFixerGain.gain.value,
+			gain: Math.log2(el.xSoundFixerGain.gain.value + 1),
 			pan: el.xSoundFixerPan.pan.value,
 			mono: el.xSoundFixerContext.destination.channelCount == 1,
 			flip: el.xSoundFixerFlipped,
@@ -78,7 +80,14 @@ browser.tabs
 					result.set(el.getAttribute('data-x-soundfixer-id'), {
 						type: el.tagName.toLowerCase(),
 						isPlaying: (el.currentTime > 0 && !el.paused && !el.ended && el.readyState > 2),
-						settings: el.xSoundFixerSettings
+						// read from the actual audio graph so the popup always shows
+						// what's really applied (also recovers old linear values)
+						settings: el.xSoundFixerContext ? {
+							gain: Math.round(Math.log2(el.xSoundFixerGain.gain.value + 1) * 100) / 100,
+							pan: el.xSoundFixerPan.pan.value,
+							mono: el.xSoundFixerContext.destination.channelCount == 1,
+							flip: el.xSoundFixerFlipped,
+						} : el.xSoundFixerSettings
 					})
 				}
 				return result
@@ -112,7 +121,7 @@ browser.tabs
             .classList.add("element-not-playing");
         const gain = node.querySelector(".element-gain");
         const gainNumberInput = node.querySelector(".element-gain-num");
-        gain.value = settings.gain || 1;
+        gain.value = settings.gain ?? 1;
         gain.parentElement.querySelector(".element-gain-num").value =
           "" + gain.value;
         gain.addEventListener("input", function () {
@@ -133,7 +142,7 @@ browser.tabs
         });
         const pan = node.querySelector(".element-pan");
         const panNumberInput = node.querySelector(".element-pan-num");
-        pan.value = settings.pan || 0;
+        pan.value = settings.pan ?? 0;
         pan.parentElement.querySelector(".element-pan-num").value =
           "" + pan.value;
         pan.addEventListener("input", function () {
@@ -152,12 +161,12 @@ browser.tabs
             "" + this.value;
         });
         const mono = node.querySelector(".element-mono");
-        mono.checked = settings.mono || false;
+        mono.checked = settings.mono ?? false;
         mono.addEventListener("change", (_) => {
           applySettings(fid, elid, { mono: mono.checked });
         });
         const flip = node.querySelector(".element-flip");
-        flip.checked = settings.flip || false;
+        flip.checked = settings.flip ?? false;
         flip.addEventListener("change", (_) => {
           applySettings(fid, elid, { flip: flip.checked });
         });
@@ -186,13 +195,29 @@ browser.tabs
         "No audio/video found in the current tab. Note that some websites do not work because of cross-domain security restrictions.";
       indivElements.remove();
     } else {
+      // Use the first media element's settings for the "All media" controls
+      // so they reflect what's actually applied instead of always resetting.
+      let firstSettings = { gain: 1, pan: 0, mono: false, flip: false };
+      outer: for (const [, els] of frameMap) {
+        for (const [, el] of els) {
+          if (el.settings) {
+            firstSettings = {
+              gain: el.settings.gain ?? 1,
+              pan: el.settings.pan ?? 0,
+              mono: el.settings.mono ?? false,
+              flip: el.settings.flip ?? false,
+            };
+            break outer;
+          }
+        }
+      }
       const node = document.createElement("div");
       node.appendChild(document.importNode(elementsTpl.content, true));
       node.querySelector(".element-label").textContent =
         `All media on the page`;
       const gain = node.querySelector(".element-gain");
       const gainNumberInput = node.querySelector(".element-gain-num");
-      gain.value = 1;
+      gain.value = firstSettings.gain;
       gainNumberInput.value = "" + gain.value;
       function applyGain(value) {
         for (const [fid, els] of frameMap) {
@@ -219,7 +244,7 @@ browser.tabs
       });
       const pan = node.querySelector(".element-pan");
       const panNumberInput = node.querySelector(".element-pan-num");
-      pan.value = 0;
+      pan.value = firstSettings.pan;
       panNumberInput.value = "" + pan.value;
       function applyPan(value) {
         for (const [fid, els] of frameMap) {
@@ -245,7 +270,7 @@ browser.tabs
         applyPan(+this.value);
       });
       const mono = node.querySelector(".element-mono");
-      mono.checked = false;
+      mono.checked = firstSettings.mono;
       mono.addEventListener("change", (_) => {
         for (const [fid, els] of frameMap) {
           for (const [elid, el] of els) {
@@ -258,7 +283,7 @@ browser.tabs
         }
       });
       const flip = node.querySelector(".element-flip");
-      flip.checked = false;
+      flip.checked = firstSettings.flip;
       flip.addEventListener("change", (_) => {
         for (const [fid, els] of frameMap) {
           for (const [elid, el] of els) {
